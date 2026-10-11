@@ -1,0 +1,171 @@
+  # Task: scaffold a podman-first CLI tool container repo, starting with yt-dlp
+
+  You are working in the root of a freshly created, public, personal GitHub repo. Its purpose:
+  build and publish container images that bundle CLI tools with all their dependencies, so
+  they can be used locally through **podman** instead of being installed on the host. The
+  first tool is a full-featured **yt-dlp**. More tools will follow, so everything must be
+  generic per tool, not yt-dlp-specific.
+
+  Get the GitHub owner and repo name from `git remote get-url origin`. Images are published
+  as `ghcr.io/<owner-lowercase>/<repo>/<tool>`.
+
+  ## Conventions (hard rules)
+
+  - Lowercase file and directory names wherever possible. The only exceptions are
+    `README.md` and `AGENTS.md`.
+  - Tool layout: `tools/<name>/<name>.containerfile`, `tools/<name>/README.md`,
+    `tools/<name>/smoke-test.sh`. Nothing else unless it's really needed.
+  - Podman is the primary consumer. Documented commands use `podman`. The images are
+    standard OCI and must also work with docker, but don't document docker.
+  - Every upstream version is pinned in the containerfile as an `ARG`, with a Renovate
+    comment directly above it so Renovate can bump it:
+    `# renovate: datasource=<pypi|github-releases|docker|...> depName=<name>`
+  - Each containerfile declares `ARG VERSION=<upstream tool version>`. CI reads that value
+    to tag the image. Document this in AGENTS.md.
+  - Keep it simple. No container vulnerability scanning, no SBOM, no signing, no hadolint.
+    "Checks" means: the image builds without errors, and the smoke test passes.
+
+  ## 1. `AGENTS.md` (+ `CLAUDE.md`)
+
+  Write a concise `AGENTS.md` that tells future agents:
+  - the repo's purpose and the conventions above
+  - the step-by-step checklist for adding a new tool (dir, containerfile, README, smoke
+    test, Renovate annotations; CI picks it up automatically)
+  - the smoke-test contract (see §3)
+  - how to build and test a tool locally with podman
+  - how the CI and publishing work (tags, weekly rebuild, Renovate)
+
+  Also create `CLAUDE.md` containing only `@AGENTS.md`, so Claude Code loads the same
+  instructions.
+  
+  ## 2. yt-dlp tool: `tools/yt-dlp/yt-dlp.containerfile`
+
+  A full-featured yt-dlp image that works for YouTube today:
+  - Multi-stage. Builder stage: create a venv and
+    `pip install "yt-dlp[default,curl-cffi]==${VERSION}"`. The `default` extra brings in
+    yt-dlp-ejs, brotli, certifi, mutagen, pycryptodomex, requests, urllib3, websockets.
+    `curl-cffi` enables `--impersonate`. Runtime stage: copy only the venv.
+  - Base image: the current stable Debian-based official `python:<ver>-slim-<debian>`
+    image, pinned by tag plus digest. Check what's current; don't guess.
+  - **ffmpeg + ffprobe**: from Debian apt (`--no-install-recommends`, clean apt lists).
+  - **deno** (yt-dlp needs it as the JS runtime for YouTube challenge solving): copy the
+    binary from the official `denoland/deno:bin-<version>` image, pinned and
+    Renovate-tracked. Check that the image is multi-arch (amd64 + arm64). If it isn't,
+    download the matching release binary per `TARGETARCH` instead.
+  - `ca-certificates` installed.
+  - Runs as a non-root user `app` with uid/gid 1000. `WORKDIR /work`. `HOME=/home/app`.
+    yt-dlp's config lives at `/home/app/.config/yt-dlp`; the cache lives at
+    `/home/app/.cache/yt-dlp`, which can be persisted with a named volume so the EJS
+    solver cache survives between runs.
+  - `ENTRYPOINT ["yt-dlp"]`, no default CMD args.
+  - OCI labels: `org.opencontainers.image.source` (repo URL, which links the GHCR package
+    to the repo), `.title`, `.description`, `.version`, `.licenses` (yt-dlp is
+    Unlicense).
+  - Must build for `linux/amd64` and `linux/arm64`.
+
+  ### `tools/yt-dlp/README.md`
+
+  - What's inside (tool and dependency list).
+  - Pull and run with podman. The canonical invocation maps your host user to the
+    container's uid 1000, so downloaded files belong to you:
+    ```sh
+    podman run --rm -it --userns=keep-id:uid=1000,gid=1000 \
+      -v "$PWD:/work" -v yt-dlp-cache:/home/app/.cache \
+      ghcr.io/<owner>/<repo>/yt-dlp:latest <args>
+    ```
+  - A ready-to-paste zsh/bash function `yt-dlp() { ... }` wrapping that command.
+  - How to mount a config file (`~/.config/yt-dlp/config` → read-only mount).
+  - Cookies: `--cookies-from-browser` can't see the host browser from inside the
+    container. Explain how to export a `cookies.txt` and mount it, with an example.
+  - A few common examples: best audio to mp3, best video+audio merged to mp4, a playlist
+    with an output template.
+  - Note for macOS: podman runs inside `podman machine`, and `$PWD` must be under a
+    directory the machine shares (your home directory is shared by default).
+  - Image tags and how often they're updated.
+
+  ## 3. Smoke test contract
+  
+  `tools/<name>/smoke-test.sh <image-ref>`: executable, `#!/usr/bin/env bash`,
+  `set -euo pipefail`. It runs the container with `${CONTAINER_ENGINE:-podman}` and exits
+  non-zero on any failure. It must **not need network access to third-party sites**,
+  because CI runners get blocked by YouTube.
+
+  For yt-dlp, check at least:
+  - `yt-dlp --version` matches the containerfile's `VERSION`
+  - `ffmpeg -version` and `ffprobe -version` run (override the entrypoint)
+  - `deno --version` runs
+  - Python can import `yt_dlp_ejs`, `curl_cffi`, `brotli`, `certifi`, `mutagen`,
+    `Cryptodome`, `websockets`
+  - `yt-dlp --list-impersonate-targets` lists curl_cffi targets as available
+  - the container runs as uid 1000 by default
+
+  ## 4. GitHub Actions
+
+  Use one reusable workflow and two thin callers, so build logic lives in one place:
+
+  - `.github/workflows/build-tool.yml` (`workflow_call`), inputs: `tool`, `push`
+    (bool), `no-cache` (bool).
+    - Matrix over the arches on **native runners**: `ubuntu-24.04` (amd64) and
+      `ubuntu-24.04-arm` (arm64). No QEMU.
+    - Per arch: build with `docker/build-push-action` + buildx, using
+      `-f tools/<tool>/<tool>.containerfile` and context `tools/<tool>`; `load: true`;
+      then run `smoke-test.sh` with `CONTAINER_ENGINE=docker`. If `push` is set, push by
+      digest after the smoke test passes. Use the GHA build cache unless `no-cache` is set.
+    - Merge job (only when `push`): build the multi-arch manifest with
+      `docker buildx imagetools create`. Tags: `latest`, `<VERSION>` (read from the
+      containerfile ARG), `<VERSION>-<yyyymmdd>`, `sha-<short>`.
+    - Permissions: `contents: read`, `packages: write` only where pushing. Log in to
+      GHCR with `GITHUB_TOKEN`.
+  - `.github/workflows/pr.yml`: on `pull_request`. Find which `tools/*` changed
+    (a changed-files job that outputs a JSON list) and call `build-tool.yml` for each
+    with `push: false`. If a change touches `.github/workflows/**`, build all tools. If no
+    tool changed, the workflow should still succeed. Add a `concurrency` group that
+    cancels superseded runs.
+  - `.github/workflows/publish.yml`: triggers:
+    - `push` to `main` → build+push changed tools
+    - `schedule` weekly (e.g. Monday 04:00 UTC) → build+push **all** tools with
+      `no-cache: true`, so apt and base-layer updates are picked up
+    - `workflow_dispatch`, with an optional `tool` input (empty = all)
+  - Discover tools dynamically from `tools/*/` directories. Never hardcode `yt-dlp` in
+    workflows.
+  - Pin third-party actions to full commit SHAs with a version comment; Renovate keeps
+    them current.
+  
+  ## 5. Dependency updates: Renovate
+
+  Use **Renovate only** (it can track the pinned ARGs; Dependabot can't). Don't add a
+  Dependabot version-updates config. Create `renovate.json` with:
+  - `config:recommended`, `helpers:pinGitHubActionDigests`
+  - `dockerfile` manager configured to match `tools/*/*.containerfile`. Check the default
+    `managerFilePatterns`/`fileMatch`, and add it explicitly if it isn't covered.
+  - a `customManagers` regex entry that picks up the
+    `# renovate: datasource=... depName=...` + `ARG X=<version>` pattern in
+    `*.containerfile`
+  - automerge for yt-dlp version bumps (calver; it updates often), only once PR checks
+    pass; normal PRs for everything else
+  - group GitHub Actions updates into one PR; schedule non-urgent updates weekly
+
+  ## 6. Root `README.md`
+
+  Short: what the repo is, the list of tools (link each tool README), how to pull and
+  use with podman, how tags and weekly rebuilds work, how to add a tool (link AGENTS.md).
+
+  ## Verification before you finish
+
+  - If `podman` is available locally, build the yt-dlp image for the host arch with
+    `podman build -f tools/yt-dlp/yt-dlp.containerfile tools/yt-dlp` and run
+    `tools/yt-dlp/smoke-test.sh` against it. Fix until it passes. If podman isn't
+    available, say so.
+  - If `actionlint` is available, run it on the workflows; otherwise review the YAML
+    carefully.
+  - Validate `renovate.json` with `npx --yes --package renovate -- renovate-config-validator`
+    if Node is available.
+
+  ## Done
+
+  Do **not** commit or push. Finish with a summary of the files you created and the
+  **manual steps** I still have to do, at least:
+  - install the Mend Renovate GitHub App on the repo
+  - after the first publish, set the GHCR package visibility to public if it isn't
+  - optional: branch protection on `main` requiring the PR checks (so Renovate automerge
+    is gated)
