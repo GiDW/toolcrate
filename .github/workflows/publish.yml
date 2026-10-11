@@ -1,0 +1,73 @@
+name: publish
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    # Weekly full rebuild without cache to pick up base image and apt updates.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+    inputs:
+      tool:
+        description: Tool to publish (empty = all tools)
+        type: string
+        required: false
+        default: ""
+
+concurrency:
+  group: publish-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+    outputs:
+      tools: ${{ steps.find.outputs.tools }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Find tools to publish
+        id: find
+        env:
+          EVENT: ${{ github.event_name }}
+          BEFORE: ${{ github.event.before }}
+          TOOL: ${{ inputs.tool }}
+        run: |
+          case "$EVENT" in
+            push)
+              tools="$(.github/scripts/list-tools.sh "$BEFORE" "$GITHUB_SHA")" ;;
+            workflow_dispatch)
+              if [[ -n "$TOOL" ]]; then
+                tools="$(.github/scripts/list-tools.sh | jq -c --arg t "$TOOL" 'map(select(. == $t))')"
+                if [[ "$tools" == "[]" ]]; then
+                  echo "::error::unknown tool '${TOOL}'"
+                  exit 1
+                fi
+              else
+                tools="$(.github/scripts/list-tools.sh)"
+              fi ;;
+            *)
+              tools="$(.github/scripts/list-tools.sh)" ;;
+          esac
+          echo "tools=${tools}" | tee -a "$GITHUB_OUTPUT"
+
+  build:
+    name: ${{ matrix.tool }}
+    needs: changes
+    if: needs.changes.outputs.tools != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: ${{ fromJSON(needs.changes.outputs.tools) }}
+    uses: ./.github/workflows/build-tool.yml
+    with:
+      tool: ${{ matrix.tool }}
+      push: true
+      no-cache: ${{ github.event_name == 'schedule' }}

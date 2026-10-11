@@ -1,0 +1,52 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "schedule": [
+    "before 6am on monday"
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Pinned ARG versions in containerfiles: # renovate: datasource=... depName=... + ARG X=<version>",
+      "managerFilePatterns": [
+        "/^tools/[^/]+/[^/]+\\.containerfile$/"
+      ],
+      "matchStrings": [
+        "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(\\s+versioning=(?<versioning>\\S+))?(\\s+extractVersion=(?<extractVersion>\\S+))?\\s*\\n\\s*ARG\\s+[A-Za-z0-9_]+=(?<currentValue>\\S+)"
+      ]
+    }
+  ],
+  "packageRules": [
+    {
+      "description": "Images in FROM lines that interpolate an ARG are bumped via the ARG's renovate annotation; the dockerfile manager can't rewrite them",
+      "matchManagers": ["dockerfile"],
+      "matchDepNames": ["docker.io/denoland/deno"],
+      "enabled": false
+    },
+    {
+      "description": "Group all GitHub Actions updates into one PR",
+      "matchManagers": [
+        "github-actions"
+      ],
+      "groupName": "GitHub Actions"
+    },
+    {
+      "description": "yt-dlp releases often and fixes site breakage: update any time, automerge once PR checks pass",
+      "matchDatasources": [
+        "pypi"
+      ],
+      "matchDepNames": [
+        "yt-dlp"
+      ],
+      "schedule": [
+        "at any time"
+      ],
+      "automerge": true,
+      "automergeType": "pr",
+      "platformAutomerge": false
+    }
+  ]
+}

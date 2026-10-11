@@ -1,0 +1,57 @@
+name: pr
+
+on:
+  pull_request:
+
+concurrency:
+  group: pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  changes:
+    runs-on: ubuntu-24.04
+    outputs:
+      tools: ${{ steps.find.outputs.tools }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Find changed tools
+        id: find
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          tools="$(.github/scripts/list-tools.sh "$BASE_SHA" "$HEAD_SHA")"
+          echo "tools=${tools}" | tee -a "$GITHUB_OUTPUT"
+
+  build:
+    name: ${{ matrix.tool }}
+    needs: changes
+    if: needs.changes.outputs.tools != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        tool: ${{ fromJSON(needs.changes.outputs.tools) }}
+    uses: ./.github/workflows/build-tool.yml
+    with:
+      tool: ${{ matrix.tool }}
+      push: false
+
+  # Single stable check name for branch protection, whichever tools were built.
+  pr-ok:
+    needs: [changes, build]
+    if: always()
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Check results
+        env:
+          RESULTS: ${{ join(needs.*.result, ' ') }}
+        run: |
+          echo "results: ${RESULTS}"
+          for r in $RESULTS; do
+            [[ "$r" == success || "$r" == skipped ]] || exit 1
+          done
