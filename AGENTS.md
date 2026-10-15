@@ -11,6 +11,9 @@ the host. Images: `ghcr.io/gidw/toolcrate/<tool>`.
   - `tools/<name>/<name>.containerfile`
   - `tools/<name>/README.md`
   - `tools/<name>/smoke-test.sh`
+  - optionally `tools/<name>/<name>`: an executable wrapper users can put in `$PATH`
+    as an alternative to the README's shell function. POSIX `sh` only
+    (`#!/bin/sh`, no bashisms), podman only.
 - Podman is the primary consumer: documented commands use `podman`. Images are standard
   OCI and must also work with docker, but don't document docker.
 - Every upstream version is pinned as an `ARG` with a Renovate annotation directly
@@ -47,7 +50,8 @@ the host. Images: `ghcr.io/gidw/toolcrate/<tool>`.
    - User `app` 1000:1000, `WORKDIR /work`, `ENTRYPOINT ["<tool>"]`.
 3. Write `tools/<name>/smoke-test.sh` following the contract below, then `chmod +x` it.
 4. Write `tools/<name>/README.md`: what's inside, the podman run command, a shell
-   function wrapper, examples, and tags.
+   function wrapper, examples, and tags. Optionally add an executable wrapper
+   `tools/<name>/<name>` (POSIX `sh`, `chmod +x`) and document it in the README.
 5. Add the tool to the list in the root `README.md`.
 6. Build and smoke-test it locally (see below).
 7. Open a PR. CI discovers tools from `tools/*/`, so no workflow changes are needed.

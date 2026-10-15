@@ -56,6 +56,16 @@ yt-dlp() {
 }
 ```
 
+### Executable wrapper
+
+Alternatively, put [`yt-dlp`](yt-dlp) (a POSIX `sh` script) in a directory on your
+`PATH`. It does the same as the shell function, and it also works from scripts and cron
+because it only allocates a TTY when there is one.
+
+```sh
+install -m 755 tools/yt-dlp/yt-dlp ~/.local/bin/yt-dlp
+```
+
 ### Config file
 
 Mount your host config read-only at the path yt-dlp reads it from:

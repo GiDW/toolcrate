@@ -21,6 +21,8 @@ podman run --rm -it --userns=keep-id:uid=1000,gid=1000 -v "$PWD:/work" \
 Each image runs as a non-root user (uid 1000) in `/work`. `--userns=keep-id:uid=1000,gid=1000`
 maps that user to you, so files written to the mounted directory belong to you. Each
 tool's README has the full command and a shell function to paste into your shell config.
+Some tools also ship an executable wrapper (`tools/<name>/<name>`) you can put in your
+`PATH` instead.
 
 ## Tags and updates
 

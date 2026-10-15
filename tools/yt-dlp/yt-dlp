@@ -1,0 +1,21 @@
+#!/bin/sh
+# Run yt-dlp from the toolcrate container image through podman.
+# Install: install -m 755 yt-dlp ~/.local/bin/yt-dlp
+set -eu
+
+# Build the podman arguments in the positional parameters ("$@" starts out as the
+# yt-dlp arguments), so paths with spaces survive without arrays.
+set -- ghcr.io/gidw/toolcrate/yt-dlp:latest "$@"
+
+cfg="$HOME/.config/yt-dlp/config"
+if [ -f "$cfg" ]; then
+  set -- -v "$cfg:/home/app/.config/yt-dlp/config:ro" "$@"
+fi
+
+# Only allocate a TTY when there is one, so piping and cron work.
+if [ -t 0 ]; then
+  set -- -t "$@"
+fi
+
+exec podman run --rm -i --userns=keep-id:uid=1000,gid=1000 \
+  -v "$PWD:/work" -v yt-dlp-cache:/home/app/.cache "$@"
