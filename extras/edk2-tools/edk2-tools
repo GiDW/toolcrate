@@ -1,0 +1,26 @@
+#!/bin/sh
+# Run TianoCore EDK II BaseTools from the toolcrate container image through podman.
+#   edk2-tools <EfiRom args>          runs EfiRom
+#   edk2-tools <Tool> <args>          runs another tool, e.g. GenFw, GenFv, VolInfo
+# Install: install -m 755 edk2-tools ~/.local/bin/edk2-tools
+set -eu
+
+tool=EfiRom
+case "${1:-}" in
+  BrotliCompress|DevicePath|EfiRom|GenCrc32|GenFfs|GenFv|GenFw|GenSec|LzmaCompress|TianoCompress|VfrCompile|VolInfo)
+    tool="$1"
+    shift
+    ;;
+esac
+
+# Build the podman arguments in the positional parameters ("$@" starts out as the
+# tool arguments), so paths with spaces survive without arrays.
+set -- ghcr.io/gidw/toolcrate/edk2-tools:latest "$@"
+
+# Only allocate a TTY when there is one, so piping and cron work.
+if [ -t 0 ]; then
+  set -- -t "$@"
+fi
+
+exec podman run --rm -i --userns=keep-id:uid=1000,gid=1000 \
+  --entrypoint "$tool" -v "$PWD:/work" "$@"

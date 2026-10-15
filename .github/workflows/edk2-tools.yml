@@ -1,0 +1,136 @@
+name: edk2-tools
+
+# Standalone workflow for extras/edk2-tools (an exception to the tools/ conventions):
+# amd64 only, and besides the image it publishes the compiled binaries as a GitHub
+# release asset. Builds and smoke-tests on PRs; pushes the image and creates the release
+# on main, weekly and on demand.
+on:
+  pull_request:
+    paths:
+      - extras/edk2-tools/**
+      - .github/workflows/edk2-tools.yml
+  push:
+    branches: [main]
+    paths:
+      - extras/edk2-tools/**
+      - .github/workflows/edk2-tools.yml
+  schedule:
+    # Weekly rebuild without cache to pick up base image and apt updates.
+    - cron: "0 4 * * 1"
+  workflow_dispatch:
+
+concurrency:
+  group: edk2-tools-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+permissions:
+  contents: read
+
+env:
+  CONTEXT: extras/edk2-tools
+  FILE: extras/edk2-tools/edk2-tools.containerfile
+
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - name: Build
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ env.CONTEXT }}
+          file: ${{ env.FILE }}
+          platforms: linux/amd64
+          load: true
+          tags: local/edk2-tools:smoke
+          no-cache: ${{ github.event_name == 'schedule' }}
+          cache-from: ${{ github.event_name != 'schedule' && 'type=gha,scope=edk2-tools' || '' }}
+          cache-to: type=gha,mode=max,scope=edk2-tools
+
+      - name: Smoke test
+        env:
+          CONTAINER_ENGINE: docker
+        run: extras/edk2-tools/smoke-test.sh local/edk2-tools:smoke
+
+  publish:
+    name: publish image and release
+    needs: test
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      packages: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
+
+      - uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Version and tags
+        id: meta
+        run: |
+          version="$(sed -n 's/^ARG VERSION=//p' "$FILE")"
+          if [[ -z "$version" ]]; then
+            echo "::error::no ARG VERSION in ${FILE}"
+            exit 1
+          fi
+          image="ghcr.io/${GITHUB_REPOSITORY,,}/edk2-tools"
+          {
+            echo "version=${version}"
+            echo "tags<<EOF"
+            echo "${image}:latest"
+            echo "${image}:${version}"
+            echo "${image}:${version}-$(date -u +%Y%m%d)"
+            echo "${image}:sha-${GITHUB_SHA::7}"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      # Same builder and inputs as the test job, so this reuses the tested layers
+      # (never no-cache here, or it would push an untested image).
+      - name: Push image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ env.CONTEXT }}
+          file: ${{ env.FILE }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          cache-from: type=gha,scope=edk2-tools
+
+      - name: Export binaries
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: ${{ env.CONTEXT }}
+          file: ${{ env.FILE }}
+          target: binaries
+          platforms: linux/amd64
+          outputs: type=local,dest=out
+          cache-from: type=gha,scope=edk2-tools
+
+      # One release per edk2 version: an existing release is left alone, so the weekly
+      # rebuild doesn't change published binaries.
+      - name: Release binaries
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          tag="edk2-tools-${VERSION}"
+          if gh release view "$tag" >/dev/null 2>&1; then
+            echo "Release ${tag} exists, skipping"
+            exit 0
+          fi
+          asset="edk2-tools-${VERSION}-linux-amd64.tar.gz"
+          tar --owner=0 --group=0 -C out -czf "$asset" .
+          sha256sum "$asset" > SHA256SUMS
+          gh release create "$tag" "$asset" SHA256SUMS \
+            --target "$GITHUB_SHA" \
+            --title "edk2-tools ${VERSION}" \
+            --notes "TianoCore EDK II BaseTools from edk2-stable${VERSION}, built for linux/amd64 (glibc). Also available as ghcr.io/${GITHUB_REPOSITORY,,}/edk2-tools:${VERSION}."

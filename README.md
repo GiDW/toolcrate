@@ -10,6 +10,15 @@ through **podman** instead of installing them on your machine. Images are multi-
 | --- | --- | --- |
 | yt-dlp | `ghcr.io/gidw/toolcrate/yt-dlp` | [README](tools/yt-dlp/README.md) |
 
+### Extras
+
+Tools that don't follow the conventions above (they live in `extras/` and have their
+own workflow):
+
+| Tool | Image | |
+| --- | --- | --- |
+| edk2-tools (amd64 only, also published as a binary release) | `ghcr.io/gidw/toolcrate/edk2-tools` | [README](extras/edk2-tools/README.md) |
+
 ## Usage
 
 ```sh

@@ -33,7 +33,7 @@ the host. Images: `ghcr.io/gidw/toolcrate/<tool>`.
   the image.
 - Images run as non-root user `app` (uid/gid 1000), `HOME=/home/app`, `WORKDIR /work`,
   with `ENTRYPOINT` set to the tool.
-- Must build for `linux/amd64` and `linux/arm64`.
+- Must build for `linux/amd64` and `linux/arm64` (the only exception is `extras/`, below).
 - Keep it simple: no vulnerability scanning, SBOM, signing or hadolint. Checks are: the
   image builds, and the smoke test passes.
 
@@ -55,6 +55,18 @@ the host. Images: `ghcr.io/gidw/toolcrate/<tool>`.
 5. Add the tool to the list in the root `README.md`.
 6. Build and smoke-test it locally (see below).
 7. Open a PR. CI discovers tools from `tools/*/`, so no workflow changes are needed.
+
+## Extras (exceptions)
+
+`extras/<name>/` holds tools that don't fit the `tools/` conventions. CI doesn't
+discover them: `list-tools.sh`, `pr.yml`, `publish.yml` and `build-tool.yml` ignore
+`extras/`, and each extra has its own workflow in `.github/workflows/<name>.yml`.
+Layout (containerfile, README, smoke test, optional wrapper), the `ARG VERSION` and
+Renovate annotation rules, and the smoke-test contract still apply.
+
+- `extras/edk2-tools`: `linux/amd64` only, and publishes the compiled binaries as a
+  GitHub release asset (`edk2-tools-<version>`, created once per version) besides the
+  image. Its containerfile has a `binaries` stage that the workflow exports.
 
 ## Smoke-test contract
 

@@ -12,7 +12,7 @@
       "customType": "regex",
       "description": "Pinned ARG versions in containerfiles: # renovate: datasource=... depName=... + ARG X=<version>",
       "managerFilePatterns": [
-        "/^tools/[^/]+/[^/]+\\.containerfile$/"
+        "/^(tools|extras)/[^/]+/[^/]+\\.containerfile$/"
       ],
       "matchStrings": [
         "#\\s*renovate:\\s*datasource=(?<datasource>\\S+)\\s+depName=(?<depName>\\S+)(\\s+versioning=(?<versioning>\\S+))?(\\s+extractVersion=(?<extractVersion>\\S+))?\\s*\\n\\s*ARG\\s+[A-Za-z0-9_]+=(?<currentValue>\\S+)"
