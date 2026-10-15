@@ -7,9 +7,12 @@ set -eu
 # yt-dlp arguments), so paths with spaces survive without arrays.
 set -- ghcr.io/gidw/toolcrate/yt-dlp:latest "$@"
 
-cfg="$HOME/.config/yt-dlp/config"
-if [ -f "$cfg" ]; then
-  set -- -v "$cfg:/home/app/.config/yt-dlp/config:ro" "$@"
+# Mount the config directory read-write (yt-dlp writes refreshed cookies back), at the
+# path yt-dlp reads it from and at its own host path, so absolute host paths in the
+# config (e.g. --cookies /Users/me/.config/yt-dlp/cookies.txt) resolve in the container.
+cfgdir="$HOME/.config/yt-dlp"
+if [ -d "$cfgdir" ]; then
+  set -- -v "$cfgdir:/home/app/.config/yt-dlp" -v "$cfgdir:$cfgdir" "$@"
 fi
 
 # Only allocate a TTY when there is one, so piping and cron work.
