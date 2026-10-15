@@ -35,11 +35,11 @@ podman run --rm -it --userns=keep-id:uid=1000,gid=1000 -v "$PWD:/work" \
 
 ### Executable wrapper
 
-Put [`edk2-tools`](edk2-tools) (a POSIX `sh` script) on your `PATH`. It runs `EfiRom`,
-or the tool you name as the first argument.
+Add the [`bin`](bin) directory to your `PATH`. It holds `edk2-tools` (a POSIX `sh` script)
+that runs `EfiRom`, or the tool you name as the first argument. Nothing to install or copy.
 
 ```sh
-install -m 755 extras/edk2-tools/edk2-tools ~/.local/bin/edk2-tools
+export PATH="$PWD/extras/edk2-tools/bin:$PATH"
 ```
 
 ### Shell function

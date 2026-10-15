@@ -58,12 +58,12 @@ yt-dlp() {
 
 ### Executable wrapper
 
-Alternatively, put [`yt-dlp`](yt-dlp) (a POSIX `sh` script) in a directory on your
-`PATH`. It does the same as the shell function, and it also works from scripts and cron
-because it only allocates a TTY when there is one.
+Alternatively, add the [`bin`](bin) directory to your `PATH`. It holds `yt-dlp` (a POSIX
+`sh` script) that does the same as the shell function, and it also works from scripts and
+cron because it only allocates a TTY when there is one. Nothing to install or copy.
 
 ```sh
-install -m 755 tools/yt-dlp/yt-dlp ~/.local/bin/yt-dlp
+export PATH="$PWD/tools/yt-dlp/bin:$PATH"
 ```
 
 ### Config file
