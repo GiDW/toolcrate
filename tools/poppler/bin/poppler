@@ -1,0 +1,22 @@
+#!/bin/sh
+# Run poppler tools from the toolcrate container image through podman.
+#   poppler <tool> <args>     e.g. poppler pdftotext in.pdf -
+#   pdftotext <args>          the same, when invoked through a symlink named after the tool
+# Add this directory to PATH: the pdf* symlinks next to this script then work like a
+# native install.
+set -eu
+
+tool="$(basename "$0")"
+if [ "$tool" = poppler ]; then
+  if [ "$#" -eq 0 ]; then
+    echo "usage: poppler <tool> [args]  (pdftotext, pdftoppm, pdfinfo, ...)" >&2
+    exit 2
+  fi
+  tool="$1"
+  shift
+fi
+
+# No TTY (-t) on purpose: poppler never prompts, and a TTY would translate newlines in
+# binary output such as `pdftoppm -png in.pdf -`.
+exec podman run --rm -i --userns=keep-id:uid=1000,gid=1000 \
+  -v "$PWD:/work" ghcr.io/gidw/toolcrate/poppler:latest "$tool" "$@"

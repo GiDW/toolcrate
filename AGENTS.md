@@ -33,7 +33,9 @@ the host. Images: `ghcr.io/gidw/toolcrate/<tool>`.
   line, before the first `FROM`. CI reads it with `sed -n 's/^ARG VERSION=//p'` to tag
   the image.
 - Images run as non-root user `app` (uid/gid 1000), `HOME=/home/app`, `WORKDIR /work`,
-  with `ENTRYPOINT` set to the tool.
+  with `ENTRYPOINT` set to the tool. For a suite of tools (e.g. `tools/poppler`) the
+  entrypoint is a small `exec "$@"` script: the first argument names the tool, and
+  `bin/` holds a dispatcher named after the tool directory plus one symlink per tool.
 - Must build for `linux/amd64` and `linux/arm64` (the only exception is `extras/`, below).
 - Keep it simple: no vulnerability scanning, SBOM, signing or hadolint. Checks are: the
   image builds, and the smoke test passes.
