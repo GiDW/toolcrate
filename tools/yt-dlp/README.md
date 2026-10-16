@@ -20,7 +20,7 @@ It runs as user `app` (uid/gid 1000) in `/work`, with `HOME=/home/app`:
 | Path | Purpose |
 | --- | --- |
 | `/work` | working directory; mount the directory you download into |
-| `/home/app/.config/yt-dlp/config` | yt-dlp config file |
+| `/home/app/.config/yt-dlp` | yt-dlp config directory (`config`, `cookies.txt`) |
 | `/home/app/.cache/yt-dlp` | yt-dlp cache, including the EJS solver cache |
 
 ## Usage
@@ -42,13 +42,13 @@ podman run --rm -it --userns=keep-id:uid=1000,gid=1000 \
 ### Shell function
 
 Paste into `~/.zshrc` or `~/.bashrc` to use `yt-dlp` as if it were installed locally.
-If `~/.config/yt-dlp/config` exists, it is mounted read-only.
+If `~/.config/yt-dlp` exists, it is mounted read-write, also at its own host path.
 
 ```sh
 yt-dlp() {
-  local cfg=()
-  if [[ -f "$HOME/.config/yt-dlp/config" ]]; then
-    cfg=(-v "$HOME/.config/yt-dlp/config:/home/app/.config/yt-dlp/config:ro")
+  local cfg=() d="$HOME/.config/yt-dlp"
+  if [[ -d "$d" ]]; then
+    cfg=(-v "$d:/home/app/.config/yt-dlp" -v "$d:$d")
   fi
   podman run --rm -it --userns=keep-id:uid=1000,gid=1000 \
     -v "$PWD:/work" -v yt-dlp-cache:/home/app/.cache "${cfg[@]}" \
@@ -66,36 +66,33 @@ cron because it only allocates a TTY when there is one. Nothing to install or co
 export PATH="$PWD/tools/yt-dlp/bin:$PATH"
 ```
 
-### Config file
+### Config file and cookies
 
-Mount your host config read-only at the path yt-dlp reads it from:
+The wrapper and the shell function mount `~/.config/yt-dlp` read-write (yt-dlp writes
+refreshed cookies back) at `/home/app/.config/yt-dlp`, and again at its own host path.
+Absolute paths into that directory therefore work unchanged, for example in your config:
+
+```
+--cookies /Users/me/.config/yt-dlp/cookies.txt
+```
+
+Absolute host paths outside that directory don't exist in the container. Write downloads
+to `/work` (the current directory) and use the bundled ffmpeg.
+
+Without the wrapper, mount the directory yourself:
 
 ```sh
+d="$HOME/.config/yt-dlp"
 podman run --rm -it --userns=keep-id:uid=1000,gid=1000 \
   -v "$PWD:/work" -v yt-dlp-cache:/home/app/.cache \
-  -v "$HOME/.config/yt-dlp/config:/home/app/.config/yt-dlp/config:ro" \
+  -v "$d:/home/app/.config/yt-dlp" -v "$d:$d" \
   ghcr.io/gidw/toolcrate/yt-dlp:latest <args>
 ```
 
-### Cookies
-
 `--cookies-from-browser` doesn't work: the container can't see your host browser's
-profile. Export a `cookies.txt` instead (Netscape format) and pass it with `--cookies`:
-
-1. Export the cookies for the site from your browser with a cookies.txt export
-   extension, for example "Get cookies.txt LOCALLY". Save the file somewhere private,
-   such as `~/.config/yt-dlp/cookies.txt`.
-2. Mount it and point `--cookies` at it. Don't mount it read-only: yt-dlp writes
-   updated cookies back to the file.
-
-```sh
-podman run --rm -it --userns=keep-id:uid=1000,gid=1000 \
-  -v "$PWD:/work" -v yt-dlp-cache:/home/app/.cache \
-  -v "$HOME/.config/yt-dlp/cookies.txt:/home/app/cookies.txt" \
-  ghcr.io/gidw/toolcrate/yt-dlp:latest --cookies /home/app/cookies.txt <url>
-```
-
-Cookies are credentials: keep the file out of shared directories, and re-export it when
+profile. Export a `cookies.txt` instead (Netscape format), for example with the "Get
+cookies.txt LOCALLY" extension, save it as `~/.config/yt-dlp/cookies.txt` and pass it
+with `--cookies`. Cookies are credentials: keep the file private and re-export it when
 it expires.
 
 ### Examples
