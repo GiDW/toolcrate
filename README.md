@@ -10,6 +10,7 @@ through **podman** instead of installing them on your machine. Images are multi-
 | --- | --- | --- |
 | yt-dlp | `ghcr.io/gidw/toolcrate/yt-dlp` | [README](tools/yt-dlp/README.md) |
 | poppler (pdftotext, pdftoppm, pdfinfo, ...) | `ghcr.io/gidw/toolcrate/poppler` | [README](tools/poppler/README.md) |
+| unpack (zip, 7z, rar, tar.*, split archives) | `ghcr.io/gidw/toolcrate/unpack` | [README](tools/unpack/README.md) |
 
 ### Extras
 
