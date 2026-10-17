@@ -11,10 +11,11 @@ the host. Images: `ghcr.io/gidw/toolcrate/<tool>`.
   - `tools/<name>/<name>.containerfile`
   - `tools/<name>/README.md`
   - `tools/<name>/smoke-test.sh`
-  - optionally `tools/<name>/bin/<name>`: an executable wrapper. Users add the `bin`
-    directory to `$PATH` (no install or copy) as an alternative to the README's shell
-    function. POSIX `sh` only
-    (`#!/bin/sh`, no bashisms), podman only.
+  - optionally `tools/<name>/bin/<name>`: an executable wrapper, an alternative to the
+    README's shell function. POSIX `sh` only (`#!/bin/sh`, no bashisms), podman only.
+    The image ships `bin/` at `/usr/local/share/toolcrate/bin/`, so users copy it out
+    with `podman run ... tar` (see a tool README) or add the repo's `bin` directory to
+    `$PATH`.
 - Podman is the primary consumer: documented commands use `podman`. Images are standard
   OCI and must also work with docker, but don't document docker.
 - Every upstream version is pinned as an `ARG` with a Renovate annotation directly
@@ -51,10 +52,12 @@ the host. Images: `ghcr.io/gidw/toolcrate/<tool>`.
    - OCI labels: `org.opencontainers.image.source=https://github.com/GiDW/toolcrate`,
      `.title`, `.description`, `.version` (`${VERSION}`), `.licenses`.
    - User `app` 1000:1000, `WORKDIR /work`, `ENTRYPOINT ["<tool>"]`.
+   - With a wrapper: `COPY bin/ /usr/local/share/toolcrate/bin/`.
 3. Write `tools/<name>/smoke-test.sh` following the contract below, then `chmod +x` it.
 4. Write `tools/<name>/README.md`: what's inside, the podman run command, a shell
    function wrapper, examples, and tags. Optionally add an executable wrapper
-   `tools/<name>/bin/<name>` (POSIX `sh`, `chmod +x`) and document it in the README.
+   `tools/<name>/bin/<name>` (POSIX `sh`, `chmod +x`) and document it in the README,
+   with the command that copies it out of the image.
 5. Add the tool to the list in the root `README.md`.
 6. Build and smoke-test it locally (see below).
 7. Open a PR. CI discovers tools from `tools/*/`, so no workflow changes are needed.
@@ -82,6 +85,8 @@ Renovate annotation rules, and the smoke-test contract still apply.
   YouTube). Run containers with `--network none`.
 - Checks at least that the tool's version matches the containerfile's `ARG VERSION`,
   that every bundled dependency runs or imports, and that the default user is uid 1000.
+- With a wrapper: checks that the image's `/usr/local/share/toolcrate/bin/` matches
+  `bin/` (files, symlinks, executable bit).
 
 ## Local build and test
 

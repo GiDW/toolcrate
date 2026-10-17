@@ -76,8 +76,17 @@ It exits non-zero if any archive failed.
 
 ### Executable wrapper (recommended)
 
-Add the [`bin`](bin) directory to your `PATH`. It holds `unpack`, a POSIX `sh` script
-that runs the image with podman. Nothing to install or copy.
+`unpack` is a POSIX `sh` script that runs the image with podman. It ships in the image:
+copy it to a directory on your `PATH`, here `~/.local/bin`:
+
+```sh
+mkdir -p ~/.local/bin
+podman run --rm --entrypoint sh ghcr.io/gidw/toolcrate/unpack:latest \
+  -c 'cd /usr/local/share/toolcrate/bin && tar -cf - *' | tar -xf - -C ~/.local/bin
+```
+
+Run that again after a `podman pull` to update the wrapper too. Or, in a clone of this
+repo, add the [`bin`](bin) directory to your `PATH` instead:
 
 ```sh
 export PATH="$PWD/tools/unpack/bin:$PATH"

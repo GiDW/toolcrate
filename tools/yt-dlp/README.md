@@ -58,9 +58,19 @@ yt-dlp() {
 
 ### Executable wrapper
 
-Alternatively, add the [`bin`](bin) directory to your `PATH`. It holds `yt-dlp` (a POSIX
-`sh` script) that does the same as the shell function, and it also works from scripts and
-cron because it only allocates a TTY when there is one. Nothing to install or copy.
+Alternatively, use the `yt-dlp` wrapper, a POSIX `sh` script that does the same as the
+shell function. It also works from scripts and cron because it only allocates a TTY when
+there is one. The wrapper ships in the image: copy it to a directory on your `PATH`, here
+`~/.local/bin`:
+
+```sh
+mkdir -p ~/.local/bin
+podman run --rm --entrypoint sh ghcr.io/gidw/toolcrate/yt-dlp:latest \
+  -c 'cd /usr/local/share/toolcrate/bin && tar -cf - *' | tar -xf - -C ~/.local/bin
+```
+
+Run that again after a `podman pull` to update the wrapper too. Or, in a clone of this
+repo, add the [`bin`](bin) directory to your `PATH` instead:
 
 ```sh
 export PATH="$PWD/tools/yt-dlp/bin:$PATH"

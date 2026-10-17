@@ -32,6 +32,9 @@ RUN groupadd --gid 1000 app \
  && mkdir -p /home/app/.config/yt-dlp /home/app/.cache/yt-dlp /work \
  && chown -R app:app /home/app /work
 
+# The executable wrappers, for users to copy out of the image (see README).
+COPY bin/ /usr/local/share/toolcrate/bin/
+
 ENV PATH="/opt/venv/bin:${PATH}" \
     HOME=/home/app \
     PYTHONUNBUFFERED=1 \

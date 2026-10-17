@@ -31,6 +31,9 @@ RUN groupadd --gid 1000 app \
  && useradd --uid 1000 --gid 1000 --create-home --shell /usr/sbin/nologin app \
  && mkdir /work && chown app:app /work
 
+# The executable wrappers, for users to copy out of the image (see README).
+COPY bin/ /usr/local/share/toolcrate/bin/
+
 USER app:app
 ENV HOME=/home/app
 WORKDIR /work

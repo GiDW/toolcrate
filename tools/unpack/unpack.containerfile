@@ -34,6 +34,9 @@ RUN groupadd --gid 1000 app \
  && mkdir -p /work \
  && chown -R app:app /home/app /work
 
+# The executable wrappers, for users to copy out of the image (see README).
+COPY bin/ /usr/local/share/toolcrate/bin/
+
 ENV HOME=/home/app
 
 USER app

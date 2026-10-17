@@ -63,6 +63,23 @@ grep -qi 'DejaVu' <<<"$fonts" || fail "DejaVu fonts not installed"
 grep -qi 'Liberation' <<<"$fonts" || fail "Liberation fonts not installed"
 ok "fonts installed"
 
+# The wrappers ship in the image: copy them out the way the README does, and compare.
+wrappers="$(mktemp -d)"
+trap 'rm -rf "$wrappers"' EXIT
+run --entrypoint sh "$image" -c 'cd /usr/local/share/toolcrate/bin && tar -cf - *' \
+  | tar -xf - -C "$wrappers" || fail "can't copy the wrappers out of the image"
+[[ "$(ls -A "$wrappers")" == "$(ls -A "$here/bin")" ]] \
+  || fail "wrappers in the image are '$(ls -A "$wrappers" | tr '\n' ' ')', expected bin/"
+for f in "$here"/bin/*; do
+  w="$wrappers/${f##*/}"
+  if [[ -L "$f" ]]; then
+    [[ "$(readlink "$w")" == "$(readlink "$f")" ]] || fail "${f##*/} in the image is not a symlink to $(readlink "$f")"
+  else
+    [[ -x "$w" ]] && cmp -s "$w" "$f" || fail "${f##*/} in the image differs from bin/${f##*/}, or isn't executable"
+  fi
+done
+ok "wrappers in the image match bin/"
+
 uid="$(run "$image" id -u)"
 gid="$(run "$image" id -g)"
 [[ "$uid:$gid" == "1000:1000" ]] || fail "runs as $uid:$gid, expected 1000:1000"

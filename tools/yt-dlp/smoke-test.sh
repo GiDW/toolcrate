@@ -42,6 +42,23 @@ debug="$(run "$image" -v 2>&1 || true)"
 grep -q 'JS runtimes: deno-' <<<"$debug" || fail "yt-dlp does not detect deno as JS runtime"
 ok "yt-dlp detects deno"
 
+# The wrappers ship in the image: copy them out the way the README does, and compare.
+wrappers="$(mktemp -d)"
+trap 'rm -rf "$wrappers"' EXIT
+run --entrypoint sh "$image" -c 'cd /usr/local/share/toolcrate/bin && tar -cf - *' \
+  | tar -xf - -C "$wrappers" || fail "can't copy the wrappers out of the image"
+[[ "$(ls -A "$wrappers")" == "$(ls -A "$here/bin")" ]] \
+  || fail "wrappers in the image are '$(ls -A "$wrappers" | tr '\n' ' ')', expected bin/"
+for f in "$here"/bin/*; do
+  w="$wrappers/${f##*/}"
+  if [[ -L "$f" ]]; then
+    [[ "$(readlink "$w")" == "$(readlink "$f")" ]] || fail "${f##*/} in the image is not a symlink to $(readlink "$f")"
+  else
+    [[ -x "$w" ]] && cmp -s "$w" "$f" || fail "${f##*/} in the image differs from bin/${f##*/}, or isn't executable"
+  fi
+done
+ok "wrappers in the image match bin/"
+
 uid="$(run --entrypoint id "$image" -u)"
 gid="$(run --entrypoint id "$image" -g)"
 [[ "$uid:$gid" == "1000:1000" ]] || fail "runs as $uid:$gid, expected 1000:1000"

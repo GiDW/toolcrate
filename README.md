@@ -32,8 +32,16 @@ podman run --rm -it --userns=keep-id:uid=1000,gid=1000 -v "$PWD:/work" \
 Each image runs as a non-root user (uid 1000) in `/work`. `--userns=keep-id:uid=1000,gid=1000`
 maps that user to you, so files written to the mounted directory belong to you. Each
 tool's README has the full command and a shell function to paste into your shell config.
-Some tools also ship an executable wrapper (`tools/<name>/bin/<name>`); add that `bin`
-directory to your `PATH` instead.
+Some tools also ship an executable wrapper (`tools/<name>/bin/<name>`). It's in the image
+too, so you can copy it from there to a directory on your `PATH`:
+
+```sh
+mkdir -p ~/.local/bin
+podman run --rm --entrypoint sh ghcr.io/gidw/toolcrate/<tool>:latest \
+  -c 'cd /usr/local/share/toolcrate/bin && tar -cf - *' | tar -xf - -C ~/.local/bin
+```
+
+Or add the tool's `bin` directory in a clone of this repo to your `PATH`.
 
 ## Tags and updates
 

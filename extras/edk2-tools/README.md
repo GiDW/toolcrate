@@ -35,8 +35,18 @@ podman run --rm -it --userns=keep-id:uid=1000,gid=1000 -v "$PWD:/work" \
 
 ### Executable wrapper
 
-Add the [`bin`](bin) directory to your `PATH`. It holds `edk2-tools` (a POSIX `sh` script)
-that runs `EfiRom`, or the tool you name as the first argument. Nothing to install or copy.
+`edk2-tools` is a POSIX `sh` script that runs `EfiRom`, or the tool you name as the first
+argument. It ships in the image: copy it to a directory on your `PATH`, here
+`~/.local/bin`:
+
+```sh
+mkdir -p ~/.local/bin
+podman run --rm --entrypoint sh ghcr.io/gidw/toolcrate/edk2-tools:latest \
+  -c 'cd /usr/local/share/toolcrate/bin && tar -cf - *' | tar -xf - -C ~/.local/bin
+```
+
+Run that again after a `podman pull` to update the wrapper too. Or, in a clone of this
+repo, add the [`bin`](bin) directory to your `PATH` instead:
 
 ```sh
 export PATH="$PWD/extras/edk2-tools/bin:$PATH"

@@ -49,4 +49,17 @@ rom_test='
 '
 check "EfiRom -d parses a ROM" run --entrypoint sh "$image" -c "$rom_test"
 
+# The wrappers ship in the image: copy them out the way the README does, and compare.
+wrappers_match() {
+  local w f
+  w="$(mktemp -d)"
+  run --entrypoint sh "$image" -c 'cd /usr/local/share/toolcrate/bin && tar -cf - *' | tar -xf - -C "$w" \
+    && [[ "$(ls -A "$w")" == "$(ls -A "$dir/bin")" ]] || { rm -rf "$w"; return 1; }
+  for f in "$dir"/bin/*; do
+    [[ -x "$w/${f##*/}" ]] && cmp -s "$w/${f##*/}" "$f" || { rm -rf "$w"; return 1; }
+  done
+  rm -rf "$w"
+}
+check "wrappers in the image match bin/" wrappers_match
+
 exit "$fail"
