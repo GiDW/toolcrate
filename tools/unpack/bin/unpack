@@ -1,0 +1,87 @@
+#!/bin/sh
+# Run unpack from the toolcrate container image through podman.
+#   unpack [options] <archive>...      see unpack --help
+# Add this directory to PATH. Archives can be anywhere: each archive's directory is
+# mounted read-only (so the other volumes of a split archive are there too), and only
+# the output directory (-o, default: the current directory) is writable. Host paths
+# appear below /host in the container.
+set -eu
+
+image="${UNPACK_IMAGE:-ghcr.io/gidw/toolcrate/unpack:latest}"
+host=/host
+nl='
+'
+
+die() { echo "unpack: $*" >&2; exit 2; }
+
+# Absolute path of an existing file, with symlinks resolved, so a symlinked archive is
+# mounted from where it really is.
+abspath() {
+  if command -v realpath >/dev/null 2>&1; then
+    realpath -- "$1"
+  else
+    d="$(cd -P -- "$(dirname -- "$1")" && pwd -P)" || return 1
+    printf '%s/%s\n' "${d%/}" "$(basename -- "$1")"
+  fi
+}
+
+# Rewrite the arguments in place ("$@" is rotated once): archive paths become /host
+# paths, -o is taken out and added back below; everything else passes through.
+out=.
+dirs=
+expect=
+opts_done=0
+n=$#
+while [ "$n" -gt 0 ]; do
+  a="$1"
+  shift
+  n=$((n - 1))
+  if [ -n "$expect" ]; then
+    if [ "$expect" = o ]; then out="$a"; else set -- "$@" "$a"; fi
+    expect=
+    continue
+  fi
+  if [ "$opts_done" = 0 ]; then
+    case "$a" in
+      -o|--output) expect=o; continue ;;
+      --output=*) out="${a#*=}"; continue ;;
+      -p|--password) set -- "$@" "$a"; expect=p; continue ;;
+      --) set -- "$@" "$a"; opts_done=1; continue ;;
+      -?*) set -- "$@" "$a"; continue ;;
+    esac
+  fi
+  [ -f "$a" ] || die "$a: no such file"
+  f="$(abspath "$a")"
+  d="$(dirname -- "$f")"
+  case "$nl$dirs$nl" in
+    *"$nl$d$nl"*) ;;
+    *) dirs="$dirs$nl$d" ;;
+  esac
+  set -- "$@" "$host$f"
+done
+[ -z "$expect" ] || die "option needs a value (see unpack --help)"
+
+mkdir -p -- "$out"
+out="$(cd -P -- "$out" && pwd -P)"
+set -- "$image" -o "$host$out" "$@"
+
+# One read-only mount per archive directory; the output directory is mounted
+# read-write, which also covers archives that are directly in it.
+set -f
+old_ifs="$IFS"
+IFS="$nl"
+for d in $dirs; do
+  [ "$d" = "$out" ] || set -- -v "$d:$host$d:ro" "$@"
+done
+IFS="$old_ifs"
+set +f
+
+# Only allocate a TTY when there is one, so a password prompt (-p -) works and piping
+# a password in does too.
+if [ -t 0 ]; then
+  set -- -t "$@"
+fi
+
+exec podman run --rm -i --userns=keep-id:uid=1000,gid=1000 \
+  --network none --cap-drop all --security-opt no-new-privileges --read-only \
+  -e UNPACK_HOST_PREFIX="$host" -v "$out:$host$out" -w "$host$out" "$@"
