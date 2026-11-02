@@ -7,7 +7,7 @@ ARG UNRAR_VERSION=7.1.8
 # renovate: datasource=repology depName=debian_13/unar
 ARG UNAR_VERSION=1.10.8
 
-FROM docker.io/library/debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+FROM docker.io/library/debian:trixie-slim@sha256:f6b08b09a05725f9431502d3b5714f5c4576e82c1a84fa1debe0c24a7e0c3ec4
 ARG VERSION
 ARG UNRAR_VERSION
 ARG UNAR_VERSION
