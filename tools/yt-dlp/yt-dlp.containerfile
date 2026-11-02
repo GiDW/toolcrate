@@ -1,7 +1,7 @@
 # renovate: datasource=pypi depName=yt-dlp
 ARG VERSION=2026.10.26
 # renovate: datasource=docker depName=denoland/deno extractVersion=^bin-(?<version>.+)$
-ARG DENO_VERSION=2.9.7
+ARG DENO_VERSION=2.9.8
 
 FROM docker.io/denoland/deno:bin-${DENO_VERSION} AS deno
 
