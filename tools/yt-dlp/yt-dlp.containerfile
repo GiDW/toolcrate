@@ -5,13 +5,13 @@ ARG DENO_VERSION=2.9.7
 
 FROM docker.io/denoland/deno:bin-${DENO_VERSION} AS deno
 
-FROM docker.io/library/python:3.14.8-slim-trixie@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170 AS builder
+FROM docker.io/library/python:3.15.2-slim-trixie@sha256:e97b88e416c3c01eb427b21fd8cd3ebf006e6ee38afcfcc3cae1c54ee2ab0a75 AS builder
 ARG VERSION
 RUN python -m venv /opt/venv \
  && /opt/venv/bin/pip install --no-cache-dir --disable-pip-version-check \
       "yt-dlp[default,curl-cffi]==${VERSION}"
 
-FROM docker.io/library/python:3.14.8-slim-trixie@sha256:a2b82f3c48559aa0a8446d9af49826b6e2b2016f4cd2afabfe6013ec53729170
+FROM docker.io/library/python:3.15.2-slim-trixie@sha256:e97b88e416c3c01eb427b21fd8cd3ebf006e6ee38afcfcc3cae1c54ee2ab0a75
 ARG VERSION
 
 LABEL org.opencontainers.image.source="https://github.com/GiDW/toolcrate" \
