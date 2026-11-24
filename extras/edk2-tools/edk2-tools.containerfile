@@ -1,7 +1,7 @@
 # renovate: datasource=github-tags depName=tianocore/edk2 extractVersion=^edk2-stable(?<version>\d+)$
 ARG VERSION=202608
 
-FROM docker.io/library/debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f AS builder
+FROM docker.io/library/debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0 AS builder
 ARG VERSION
 RUN apt-get update \
  && apt-get install -y --no-install-recommends build-essential ca-certificates git python3 uuid-dev \
@@ -16,7 +16,7 @@ RUN git clone --depth 1 --branch "edk2-stable${VERSION}" https://github.com/tian
 FROM scratch AS binaries
 COPY --from=builder /edk2/BaseTools/Source/C/bin/ /
 
-FROM docker.io/library/debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+FROM docker.io/library/debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0
 ARG VERSION
 
 LABEL org.opencontainers.image.source="https://github.com/GiDW/toolcrate" \
