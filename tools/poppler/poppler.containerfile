@@ -1,7 +1,7 @@
 # renovate: datasource=repology depName=debian_13/poppler-utils
 ARG VERSION=25.03.0
 
-FROM docker.io/library/debian:trixie-slim@sha256:a29215f6a35e51e22adffa17f89e9d2ef06214e64a2bad10d765c46aea49f11f
+FROM docker.io/library/debian:trixie-slim@sha256:8aa5a7bf5a1955bddbe7d74fcdd0b91ab30e74362a8b73af672b0481b35b44a0
 ARG VERSION
 
 LABEL org.opencontainers.image.source="https://github.com/GiDW/toolcrate" \
